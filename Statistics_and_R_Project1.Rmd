@@ -84,3 +84,8 @@ str(data_day)
 summary(data_day)
 
 ```
+Как можно заметить, в наших данных присутствуют NA значения, а именно в переменных temp, hum, windspeed, registered
+
+
+
+
