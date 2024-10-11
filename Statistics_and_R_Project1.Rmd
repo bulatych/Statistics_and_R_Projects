@@ -70,7 +70,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Обзор данных
 
-```{r libraries}
+```{r libraries, include=FALSE}
  library(dplyr) 
 library(ggplot2) 
 library(tidyverse) 
@@ -78,14 +78,29 @@ main_dir <- dirname(rstudioapi::getSourceEditorContext()$path)
 setwd(main_dir)
 ```
 
-``` {r,  echo=FALSE}
+```{r,  echo=FALSE}
 data_day <- read.csv("day.csv") 
 str(data_day)
 summary(data_day)
 
 ```
-Как можно заметить, в наших данных присутствуют NA значения, а именно в переменных temp, hum, windspeed, registered
 
+Как можно заметить, в наших данных присутствуют NA значения, а именно в переменных temp, hum, windspeed, registered Также необходимо проверить, есть ли значения с пустыми строками:
 
+```{r}
+data_day_na <- data_day %>% 
+  mutate(across(where(~ !is.Date(.)), ~ ifelse(. == "", NA, .)))
+summary(data_day_na)
+```
 
+Таким образом количество NA не увеличилось, что говорит об отсутствии пустых ячеек Можем взглянуть на строки с NA
 
+```{r}
+ data_day_na[!complete.cases(data_day),]
+```
+
+Теперь удалим все пропущенные значения NA
+
+```{r}
+bicycle_rent_clean <- na.omit(data_day_na)
+```
