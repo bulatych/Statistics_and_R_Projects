@@ -166,6 +166,17 @@ ggplot(bicycle_rent_clean_fix, aes(x = temp, y = atemp)) +
 bicycle_rent_clean_fix_f1 <- filter(bicycle_rent_clean_fix, !(season == '3' & atemp < 0.4))
 ```
 
+Теперь посмотрим на наши парные графики с распределением для числовых величин.
+
+```{r}
+#install.packages("GGally")
+library(GGally)
+
+# Создание парных графиков
+ggpairs(bicycle_rent_clean_fix_f1 %>% select(temp, atemp, hum, windspeed, casual, registered, cnt), 
+        title = "Парные графики")
+```
+
 Теперь взглянем на зависимость влажности от месяца
 
 ```{r, echo =TRUE}
@@ -173,7 +184,7 @@ ggplot(bicycle_rent_clean_fix_f1, aes(x = factor(mnth), y = hum)) +
   geom_boxplot(aes(fill = factor(season))) +
   labs(x = "Month", y = "Humidity", fill = "Season") +
   facet_grid(. ~ season, scales = "free_x", space = "free_x") 
-bicycle_rent_clean_fix_f2 <-  filter(bicycle_rent_clean_fix_f1, !( mnth == 3 & hum < 0.1))
+bicycle_rent_clean_fix_f2 <- filter(bicycle_rent_clean_fix_f1, !( mnth == 3 & hum < 0.1))
 ```
 
 В третьем месяце видим значение влажности равное 0, что очевидно является выбросом. Чтобы решить, что делать со значениями, которые выходят за 1,5 межквартильных размаха, взглянем на другие переменные в датасете.
@@ -267,9 +278,10 @@ test_result <-  t.test(year_2011_bicycle_rent_clean$registered,   year_2012_bicy
 ```{r, echo=TRUE, message=TRUE}
 table(bicycle_rent_clean_fix_f2$weathersit, bicycle_rent_clean_fix_f2$cnt > median(bicycle_rent_clean_fix_f2$cnt))
 chisq_result <-  chisq.test(table(bicycle_rent_clean_fix_f2$weathersit, bicycle_rent_clean_fix_f2$cnt > median(bicycle_rent_clean_fix_f2$cnt)))
+chisq_result
 ```
 
-В колонке TRUE записао количество прокатов, превышающих медианное значение для трех состояний погды. В FALSE количество, не превышающее медианное значение. Таким образом, стостояние погоды действительно влияет на количество прокатов (p-value: `r chisq_result$p.value`, X-squared:`r chisq_result$statistic`)
+В колонке TRUE записано количество прокатов, превышающих медианное значение для трех состояний погды. В FALSE количество, не превышающее медианное значение. Таким образом, стостояние погоды действительно влияет на количество прокатов (p-value: `r chisq_result$p.value`, X-squared:`r chisq_result$statistic`)
 
 ```         
 1)  Проверим еще одну гипотезу: есть ли различия в количестве прокатов в рабочие и выходные дни.
@@ -281,7 +293,73 @@ chisq_result <-  chisq.test(table(bicycle_rent_clean_fix_f2$weathersit, bicycle_
 
 ```{r, echo=TRUE}
 mann_whitney_test <- wilcox.test(cnt ~ workingday, data = bicycle_rent_clean_fix_f2)
-
+mann_whitney_test
 ```
 
 Таким образом верна нулевая гипотеза и распределение количества прокатов не отличается в рабочие и нерабочие дни. p.value = `r mann_whitney_test$p.value`, статистика = `r mann_whitney_test$statistic`
+
+Теперь попробуем посмотреть насколько много арендуют велосипеды летом и весной. Различаются ли данные выборки в обоих годах?
+
+Для начала отфильтруем интересные нам данные и проверим их на нормальность, чтобы понять какой тест мы можем применить.
+
+```{r, echo=TRUE}
+spring_bicycle_rent_clean <- bicycle_rent_clean_fix_f2 %>% filter(season == 2)
+summer_bicycle_rent_clean <- bicycle_rent_clean_fix_f2 %>% filter(season == 3)
+shapiro.test(season_spring_bicycle_rent_clean$cnt)
+shapiro.test(season_summer_bicycle_rent_clean$cnt)
+
+```
+
+Пу-пу-пу-пууууу.... Похоже в соответствии с нашими расчётами можно сделать вывод о том, что данные в нашей выборки взяты из генеральной совокупности с ненормальным распределением, т.к. значение p value меньше заданного уровня значимости 0,05.
+
+```{r, echo=TRUE}
+season_bicycle_rent_clean <- bicycle_rent_clean_fix_f2 %>% filter(season == 2 | season == 3)
+ggplot(season_bicycle_rent_clean, aes(x = cnt, color = as.factor(season))) +
+  geom_density() +
+  labs(title = "Плотность аренды велосипедов по сезонам",
+       x = "Количество арендованных велосипедов",
+       y = "Плотность",
+       color = "Сезон") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Однако нельзя забывать, что мы уже заметили некоторый прирост пользователей в 2012 году по сравнению с 2011. Чтож, давайте попробуем разделить их по годам и посмотреть, что получится.
+
+```{r, echo=TRUE}
+year_2011_bicycle_rent_clean <- season_bicycle_rent_clean %>% filter(yr == 2011)
+year_2012_bicycle_rent_clean <- season_bicycle_rent_clean %>% filter(yr == 2012)
+ggplot(season_bicycle_rent_clean, aes(x = cnt, color = interaction(as.factor(season), yr))) +
+  geom_density() +
+  labs(title = "Плотность аренды велосипедов по годам весной и летом",
+       x = "Количество арендованных велосипедов",
+       y = "Плотность",
+       color = "Сезон") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+На данном графике это прекрасно видно. Давайте выберем для сравнения 2012 год.
+
+1)  Определим нулевую и альтернативные гипотезы - величины распределены одинаково распределение величин отличается.
+
+2)  Зафиксируем уровень значимости - 0.05
+
+3)  Выберем для независимых выборок непараметрический критерий Манна-Уитни, т.к. распределение ненормальное.
+
+    ```{r}
+    spring_bicycle_rent_clean_2012 <- season_bicycle_rent_clean %>% filter(yr == 2012)
+    summer_bicycle_rent_clean_2012 <- season_bicycle_rent_clean %>% filter(yr == 2012)
+    shapiro.test(spring_bicycle_rent_clean_2012$cnt)
+    shapiro.test(summer_bicycle_rent_clean_2012$cnt)
+    ```
+
+4)  Считаем статистику
+
+    ```{r}
+    wilcox.test(spring_bicycle_rent_clean_2012$cnt, summer_bicycle_rent_clean_2012$cnt, correct = F)
+    #t_stat_season <- t.test(spring_bicycle_rent_clean_2012$cnt, summer_bicycle_rent_clean_2012$cnt, paired = FALSE)
+    #t_stat_season
+    ```
+
+5)  Согласно тесту наши выборки достоверно отличаются, на основании чего мы можем сказать, что летом спрос на велосипеды выше.
